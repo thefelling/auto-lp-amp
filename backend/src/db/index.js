@@ -8,7 +8,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-// Test connection
+// Test connection on startup
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error('❌ Database connection failed:', err.message);

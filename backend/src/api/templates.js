@@ -2,11 +2,9 @@ const express = require('express');
 const { authenticate } = require('../middleware/auth');
 const pool = require('../db');
 const { scrapeWebsite } = require('../modules/scraper');
-const { sendTelegramLog } = require('../modules/logger');
 
 const router = express.Router();
 
-// === CREATE TEMPLATE FROM URL ===
 router.post('/scrape', authenticate, async (req, res, next) => {
   try {
     const { name, url } = req.body;
@@ -31,16 +29,12 @@ router.post('/scrape', authenticate, async (req, res, next) => {
       JSON.stringify(scrapedData.layout)
     ]);
     
-    await sendTelegramLog(`📁 Template created\nUser: ${req.user.username}\nName: ${name}\nSource: ${url}`);
-    
     res.status(201).json(result.rows[0]);
-    
   } catch (error) {
     next(error);
   }
 });
 
-// === GET ALL TEMPLATES ===
 router.get('/list', authenticate, async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -53,22 +47,18 @@ router.get('/list', authenticate, async (req, res, next) => {
     `, [userId]);
     
     res.json(result.rows);
-    
   } catch (error) {
     next(error);
   }
 });
 
-// === DELETE TEMPLATE ===
 router.delete('/:id', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
     
     await pool.query('DELETE FROM templates WHERE id = $1 AND user_id = $2', [id, userId]);
-    
     res.json({ message: 'Template deleted' });
-    
   } catch (error) {
     next(error);
   }
