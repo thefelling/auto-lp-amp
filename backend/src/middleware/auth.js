@@ -12,33 +12,27 @@ const authenticate = async (req, res, next) => {
 
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // === IF MASTER: ambil UUID dari database pake MASTER_USERNAME dari ENV ===
-    if (decoded.id === 'master' || decoded.role === 'master') {
+    // === IF MASTER ===
+    if (decoded.role === 'master' || decoded.id === 'master') {
       const masterUsername = process.env.MASTER_USERNAME;
       
       if (!masterUsername) {
         console.error('❌ MASTER_USERNAME not set in environment!');
-        return res.status(500).json({ error: 'Server configuration error' });
+        return res.status(500).json({ error: 'Server configuration error: MASTER_USERNAME not set' });
       }
 
-      // Cari user master di database
       const masterResult = await pool.query(
         'SELECT id, username, role FROM users WHERE username = $1 AND role = $2',
         [masterUsername, 'master']
       );
 
       if (masterResult.rows.length === 0) {
-        // Fallback: kalo ga nemu master di DB, pake 'master' sebagai ID
-        console.warn('⚠️ Master user not found in database, using fallback');
-        req.user = {
-          id: 'master',
-          username: masterUsername,
-          role: 'master'
-        };
-        return next();
+        console.error(`❌ Master user "${masterUsername}" not found in database!`);
+        return res.status(401).json({ 
+          error: `Master account "${masterUsername}" not found. Please register first.` 
+        });
       }
 
-      // Pake UUID dari database
       req.user = {
         id: masterResult.rows[0].id,
         username: masterResult.rows[0].username,
