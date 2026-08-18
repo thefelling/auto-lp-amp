@@ -7,25 +7,46 @@ const { transformAMP, transformLP } = require('../modules/transformer');
 const { sendTelegramLog } = require('../modules/logger');
 const pool = require('../db');
 
-const connection = new Redis(process.env.REDIS_URL);
+// Redis connection
+const redisUrl = process.env.REDIS_URL || process.env.REDIS_PUBLIC_URL;
 
-/**
- * Worker untuk job generate AMP
- */
+if (!redisUrl) {
+  console.error('❌ REDIS_URL not set! Worker will not start.');
+  process.exit(1);
+}
+
+console.log(`📊 Redis URL: ${redisUrl.replace(/\/\/.*@/, '//*****@')}`);
+
+const connection = new Redis(redisUrl, {
+  maxRetriesPerRequest: 3,
+  retryStrategy: (times) => {
+    if (times > 3) {
+      console.error('❌ Redis connection failed after 3 retries');
+      return null;
+    }
+    return Math.min(times * 100, 2000);
+  }
+});
+
+connection.on('error', (err) => {
+  console.error('❌ Redis Error:', err.message);
+});
+
+connection.on('connect', () => {
+  console.log('✅ Redis connected');
+});
+
+// ===== AMP WORKER =====
 const ampWorker = new Worker('amp-generation', async (job) => {
   console.log(`📦 Processing AMP job ${job.id}`);
   
   try {
     const { userId, sourceDomain, siteName, canonical, targetLink, titles } = job.data;
     
-    // 1. Scrape
     const scrapedData = await scrapeWebsite(sourceDomain);
-    
-    // 2. Generate konten
     const selectedTitle = titles[Math.floor(Math.random() * titles.length)];
     const description = await generateDescription(selectedTitle);
     
-    // 3. Generate gambar
     const heroImage = await generateImage({
       prompt: `Hero for ${siteName}, theme: judi`,
       type: 'hero'
@@ -39,18 +60,16 @@ const ampWorker = new Worker('amp-generation', async (job) => {
       type: 'favicon'
     });
     
-    // 4. Transform HTML
     const html = await transformAMP({
       scrapedData,
       siteName,
-      canonical,
-      targetLink,
+      canonical: canonical || sourceDomain,
+      targetLink: targetLink || sourceDomain,
       title: selectedTitle,
       description,
       images: { hero: heroImage.url, logo: logo.url, favicon: favicon.url }
     });
     
-    // 5. Simpan ke database
     const result = await pool.query(`
       INSERT INTO projects (
         user_id, type, source_domain, site_name, canonical_url, target_link,
@@ -58,13 +77,12 @@ const ampWorker = new Worker('amp-generation', async (job) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id
     `, [
-      userId, 'amp', sourceDomain, siteName, canonical, targetLink,
+      userId, 'amp', sourceDomain, siteName, canonical || sourceDomain, targetLink || sourceDomain,
       JSON.stringify({ title: selectedTitle, description }),
       html,
       'ready'
     ]);
     
-    // 6. Simpan assets
     const projectId = result.rows[0].id;
     for (const [type, data] of Object.entries({ hero: heroImage, logo, favicon })) {
       if (data && data.url) {
@@ -83,11 +101,9 @@ const ampWorker = new Worker('amp-generation', async (job) => {
     console.error(`❌ AMP job ${job.id} failed:`, error.message);
     throw error;
   }
-});
+}, { connection });
 
-/**
- * Worker untuk job generate LP
- */
+// ===== LP WORKER =====
 const lpWorker = new Worker('lp-generation', async (job) => {
   console.log(`📦 Processing LP job ${job.id}`);
   
@@ -102,13 +118,13 @@ const lpWorker = new Worker('lp-generation', async (job) => {
     const html = await transformLP({
       scrapedData,
       siteName,
-      canonical,
-      ampLink,
+      canonical: canonical || sourceDomain,
+      ampLink: ampLink || sourceDomain,
       title,
       description,
       content,
       images,
-      miniGame
+      miniGame: miniGame || { enabled: false }
     });
     
     const result = await pool.query(`
@@ -119,13 +135,13 @@ const lpWorker = new Worker('lp-generation', async (job) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING id
     `, [
-      userId, 'landingpage', sourceDomain, siteName, canonical, ampLink,
+      userId, 'landingpage', sourceDomain, siteName, canonical || sourceDomain, ampLink || sourceDomain,
       JSON.stringify({ title, description }),
       html,
       'ready',
-      miniGame.enabled,
-      miniGame.type,
-      miniGame.position
+      miniGame?.enabled || false,
+      miniGame?.type || null,
+      miniGame?.position || null
     ]);
     
     await sendTelegramLog(`✅ LP Generated (Queue)\nUser ID: ${userId}\nSite: ${siteName}`);
@@ -136,9 +152,9 @@ const lpWorker = new Worker('lp-generation', async (job) => {
     console.error(`❌ LP job ${job.id} failed:`, error.message);
     throw error;
   }
-});
+}, { connection });
 
-// Event listeners
+// ===== EVENT LISTENERS =====
 ampWorker.on('completed', (job) => {
   console.log(`✅ AMP job ${job.id} completed`);
 });
@@ -156,3 +172,5 @@ lpWorker.on('failed', (job, err) => {
 });
 
 console.log('✅ BullMQ Workers started');
+
+module.exports = { ampWorker, lpWorker };

@@ -5,8 +5,7 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js",
-    "postinstall": "echo '✅ Dependencies installed'"
+    "dev": "nodemon src/app.js"
   },
   "dependencies": {
     "@fal-ai/client": "^1.2.0",
@@ -18,13 +17,13 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
+    "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.63.0",
     "pg": "^8.12.0",
-    "puppeteer-core": "^23.4.1",
-    "ioredis": "^5.4.1"
+    "puppeteer-core": "^23.4.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

@@ -6,21 +6,15 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
 
-// ===== IMPORT ROUTES =====
 const authRoutes = require('./api/auth');
 const adminRoutes = require('./api/admin');
 const projectRoutes = require('./api/projects');
 const templateRoutes = require('./api/templates');
 const systemRoutes = require('./api/system');
-
-// ===== IMPORT MIDDLEWARE =====
 const { errorHandler } = require('./middleware/error');
-
-// ===== IMPORT DATABASE =====
 const pool = require('./db');
 
-// ===== START WORKER (BullMQ) =====
-// Jalankan worker di background, tapi skip kalo di environment test
+// ===== START WORKER =====
 if (process.env.NODE_ENV !== 'test') {
   try {
     require('./queue/worker');
@@ -30,13 +24,10 @@ if (process.env.NODE_ENV !== 'test') {
   }
 }
 
-// ===== INIT APP =====
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ============================================
-// LOGGING STARTUP
-// ============================================
+// ===== LOGGING STARTUP =====
 console.log('🚀 Starting Auto LP & AMP Backend...');
 console.log('═══════════════════════════════════════');
 console.log(`📊 DATABASE_URL   : ${process.env.DATABASE_URL ? '✅ Set' : '❌ Not Set'}`);
@@ -44,21 +35,15 @@ console.log(`📊 REDIS_URL      : ${process.env.REDIS_URL ? '✅ Set' : '❌ No
 console.log(`🔑 OPENAI_API_KEY : ${process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Not Set'}`);
 console.log(`🎨 FAL_API_KEY    : ${process.env.FAL_API_KEY ? '✅ Set' : '❌ Not Set'}`);
 console.log(`☁️ CLOUDFLARE     : ${process.env.CLOUDFLARE_API_TOKEN ? '✅ Set' : '❌ Not Set'}`);
-console.log(`🤖 TELEGRAM      : ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Set' : '❌ Not Set'}`);
 console.log(`👤 MASTER_USERNAME: ${process.env.MASTER_USERNAME ? '✅ Set' : '❌ Not Set'}`);
 console.log('═══════════════════════════════════════');
 
-// ============================================
-// MIDDLEWARE
-// ============================================
-
-// Security headers
+// ===== MIDDLEWARE =====
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginEmbedderPolicy: false,
 }));
 
-// CORS
 app.use(cors({
   origin: '*',
   credentials: true,
@@ -66,48 +51,24 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
-// Logging
 app.use(morgan('dev'));
-
-// Body parser
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Static files (untuk akses gambar/assets)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
-// ============================================
-// ROUTES
-// ============================================
-
-// === AUTH ===
+// ===== ROUTES =====
 app.use('/api/auth', authRoutes);
-
-// === ADMIN (master only) ===
 app.use('/api/admin', adminRoutes);
-
-// === PROJECTS (AMP + LP) ===
 app.use('/api/projects', projectRoutes);
-
-// === TEMPLATES ===
 app.use('/api/templates', templateRoutes);
-
-// === SYSTEM ===
 app.use('/api/system', systemRoutes);
 
-// ============================================
-// HEALTH CHECK
-// ============================================
-
+// ===== HEALTH CHECK =====
 app.get('/health', async (req, res) => {
   try {
-    // Cek database
     const dbResult = await pool.query('SELECT 1');
-    const dbConnected = dbResult.rows.length > 0;
-    
     res.json({
       status: 'healthy',
-      database: dbConnected ? 'connected' : 'disconnected',
+      database: dbResult.rows.length > 0 ? 'connected' : 'disconnected',
       uptime: Math.floor(process.uptime()),
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'production',
@@ -123,10 +84,6 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// ============================================
-// ROOT ENDPOINT
-// ============================================
-
 app.get('/', (req, res) => {
   res.json({
     name: 'Auto LP & AMP Generator API',
@@ -140,14 +97,10 @@ app.get('/', (req, res) => {
       system: '/api/system',
       admin: '/api/admin (master only)',
     },
-    documentation: 'Coming soon...',
   });
 });
 
-// ============================================
-// 404 HANDLER
-// ============================================
-
+// ===== 404 =====
 app.use((req, res) => {
   res.status(404).json({
     error: 'Endpoint not found',
@@ -157,26 +110,16 @@ app.use((req, res) => {
   });
 });
 
-// ============================================
-// ERROR HANDLER (harus di paling akhir)
-// ============================================
-
+// ===== ERROR HANDLER =====
 app.use(errorHandler);
 
-// ============================================
-// START SERVER
-// ============================================
-
+// ===== START SERVER =====
 const server = app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 http://localhost:${PORT}`);
   console.log(`🩺 Health check: http://localhost:${PORT}/health`);
   console.log('═══════════════════════════════════════');
 });
-
-// ============================================
-// GRACEFUL SHUTDOWN
-// ============================================
 
 process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM received, closing server...');
@@ -193,9 +136,5 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
-
-// ============================================
-// EXPORT (untuk testing)
-// ============================================
 
 module.exports = app;
