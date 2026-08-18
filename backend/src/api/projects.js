@@ -17,17 +17,12 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.post('/amp/generate', authenticate, upload.single('titleFile'), async (req, res, next) => {
   try {
     const { sourceDomain, siteName, canonical, targetLink } = req.body;
-    
-    // ✅ userId sekarang UUID (dari auth.js)
     const userId = req.user.id;
-    
-    console.log(`📝 Generating AMP for user: ${userId}, site: ${siteName}`);
 
     if (!sourceDomain || !siteName) {
       return res.status(400).json({ error: 'sourceDomain and siteName required' });
     }
 
-    // 1. Parse title file
     if (!req.file) {
       return res.status(400).json({ error: 'titleFile is required' });
     }
@@ -41,11 +36,8 @@ router.post('/amp/generate', authenticate, upload.single('titleFile'), async (re
 
     const selectedTitle = titles[Math.floor(Math.random() * titles.length)];
     const description = await generateDescription(selectedTitle);
-
-    // 2. Scrape website
     const scrapedData = await scrapeWebsite(sourceDomain);
 
-    // 3. Generate images
     const heroImage = await generateImage({
       prompt: `Hero image for ${siteName}, theme: judi online, modern, elegant female character, 8k`,
       type: 'hero'
@@ -59,7 +51,6 @@ router.post('/amp/generate', authenticate, upload.single('titleFile'), async (re
       type: 'favicon'
     });
 
-    // 4. Transform HTML
     const html = await transformAMP({
       scrapedData,
       siteName,
@@ -67,14 +58,9 @@ router.post('/amp/generate', authenticate, upload.single('titleFile'), async (re
       targetLink: targetLink || sourceDomain,
       title: selectedTitle,
       description,
-      images: { 
-        hero: heroImage.url, 
-        logo: logo.url, 
-        favicon: favicon.url 
-      }
+      images: { hero: heroImage.url, logo: logo.url, favicon: favicon.url }
     });
 
-    // 5. ✅ INSERT ke database pake userId (UUID)
     const result = await pool.query(`
       INSERT INTO projects (
         user_id, type, source_domain, site_name, canonical_url, target_link,
@@ -82,39 +68,25 @@ router.post('/amp/generate', authenticate, upload.single('titleFile'), async (re
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id
     `, [
-      userId,  // ← SEKARANG UUID, BUKAN 'master'!
-      'amp', 
-      sourceDomain, 
-      siteName, 
-      canonical || sourceDomain, 
-      targetLink || sourceDomain,
+      userId, 'amp', sourceDomain, siteName, canonical || sourceDomain, targetLink || sourceDomain,
       JSON.stringify({ title: selectedTitle, description }),
       html,
       'ready'
     ]);
 
     const projectId = result.rows[0].id;
-
-    // 6. Save assets
     await saveAssets(projectId, { hero: heroImage, logo, favicon });
-
-    // 7. Telegram log
-    await sendTelegramLog(`✅ AMP Generated\nUser: ${req.user.username}\nSite: ${siteName}\nTitle: ${selectedTitle}`);
+    await sendTelegramLog(`✅ AMP Generated\nUser: ${req.user.username}\nSite: ${siteName}`);
 
     res.status(201).json({
       projectId,
       title: selectedTitle,
       description,
       html,
-      images: { 
-        hero: heroImage.url, 
-        logo: logo.url, 
-        favicon: favicon.url 
-      }
+      images: { hero: heroImage.url, logo: logo.url, favicon: favicon.url }
     });
 
   } catch (error) {
-    console.error('❌ AMP generation error:', error.message);
     next(error);
   }
 });
@@ -139,9 +111,6 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
     const userId = req.user.id;
     let title, description, heroImage, logo, favicon;
 
-    console.log(`📝 Generating LP for user: ${userId}, site: ${siteName}`);
-
-    // If using AMP title
     if (useAmpTitle === 'true') {
       const ampProject = await pool.query(`
         SELECT config, html_content FROM projects
@@ -156,32 +125,22 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       }
     }
 
-    // If no AMP title, generate fresh
     if (!title) {
       if (!req.file) {
-        return res.status(400).json({ error: 'titleFile is required when not using AMP title' });
+        return res.status(400).json({ error: 'titleFile is required' });
       }
 
       const titleContent = req.file.buffer.toString('utf-8');
       const titles = parseTitleFile(titleContent, siteName);
       if (titles.length === 0) {
-        return res.status(400).json({ error: 'No title found for site name: ' + siteName });
+        return res.status(400).json({ error: 'No title found' });
       }
       title = titles[Math.floor(Math.random() * titles.length)];
       description = await generateDescription(title);
 
-      heroImage = await generateImage({ 
-        prompt: `Hero for ${siteName}`, 
-        type: 'hero' 
-      });
-      logo = await generateImage({ 
-        prompt: `Logo for ${siteName}`, 
-        type: 'logo' 
-      });
-      favicon = await generateImage({ 
-        prompt: `Favicon for ${siteName}`, 
-        type: 'favicon' 
-      });
+      heroImage = await generateImage({ prompt: `Hero for ${siteName}`, type: 'hero' });
+      logo = await generateImage({ prompt: `Logo for ${siteName}`, type: 'logo' });
+      favicon = await generateImage({ prompt: `Favicon for ${siteName}`, type: 'favicon' });
     }
 
     const scrapedData = await scrapeWebsite(sourceDomain);
@@ -195,11 +154,7 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       title,
       description,
       content,
-      images: { 
-        hero: heroImage?.url, 
-        logo: logo?.url, 
-        favicon: favicon?.url 
-      },
+      images: { hero: heroImage?.url, logo: logo?.url, favicon: favicon?.url },
       miniGame: {
         enabled: miniGameEnabled === 'true',
         type: miniGameType || 'spin',
@@ -216,12 +171,7 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING id
     `, [
-      userId,
-      'landingpage',
-      sourceDomain,
-      siteName,
-      canonical || sourceDomain,
-      ampLink || sourceDomain,
+      userId, 'landingpage', sourceDomain, siteName, canonical || sourceDomain, ampLink || sourceDomain,
       JSON.stringify({ title, description }),
       html,
       'ready',
@@ -244,15 +194,10 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       title,
       description,
       html,
-      images: { 
-        hero: heroImage?.url, 
-        logo: logo?.url, 
-        favicon: favicon?.url 
-      }
+      images: { hero: heroImage?.url, logo: logo?.url, favicon: favicon?.url }
     });
 
   } catch (error) {
-    console.error('❌ LP generation error:', error.message);
     next(error);
   }
 });
@@ -295,10 +240,10 @@ router.get('/:id', authenticate, async (req, res, next) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    const result = await pool.query(`
-      SELECT * FROM projects
-      WHERE id = $1 AND user_id = $2
-    `, [id, userId]);
+    const result = await pool.query(
+      'SELECT * FROM projects WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Project not found' });
@@ -344,7 +289,7 @@ router.delete('/history/all/:type', authenticate, async (req, res, next) => {
 });
 
 // ============================================
-// 7. GET SCRIPT (HTML)
+// 7. GET SCRIPT
 // ============================================
 router.get('/:id/script', authenticate, async (req, res, next) => {
   try {

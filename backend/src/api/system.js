@@ -4,6 +4,9 @@ const pool = require('../db');
 
 const router = express.Router();
 
+// ============================================
+// HEALTH CHECK
+// ============================================
 router.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -21,6 +24,9 @@ router.get('/health', async (req, res) => {
   }
 });
 
+// ============================================
+// BALANCE (master only)
+// ============================================
 router.get('/balance', authenticate, isMaster, async (req, res) => {
   res.json({
     openai: { credits: 10.00 },

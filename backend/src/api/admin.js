@@ -5,6 +5,9 @@ const { authenticate, isMaster } = require('../middleware/auth');
 
 const router = express.Router();
 
+// ============================================
+// GET ALL USERS (master only)
+// ============================================
 router.get('/users', authenticate, isMaster, async (req, res, next) => {
   try {
     const result = await pool.query(`
@@ -19,6 +22,9 @@ router.get('/users', authenticate, isMaster, async (req, res, next) => {
   }
 });
 
+// ============================================
+// CREATE SUB-USER (master only)
+// ============================================
 router.post('/users', authenticate, isMaster, async (req, res, next) => {
   try {
     const { username, password } = req.body;
@@ -44,6 +50,9 @@ router.post('/users', authenticate, isMaster, async (req, res, next) => {
   }
 });
 
+// ============================================
+// DELETE USER (master only)
+// ============================================
 router.delete('/users/:id', authenticate, isMaster, async (req, res, next) => {
   try {
     const { id } = req.params;
