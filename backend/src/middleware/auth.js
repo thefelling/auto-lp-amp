@@ -12,17 +12,42 @@ const authenticate = async (req, res, next) => {
 
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // If master
-    if (decoded.id === 'master') {
+    // === IF MASTER: ambil UUID dari database pake MASTER_USERNAME dari ENV ===
+    if (decoded.id === 'master' || decoded.role === 'master') {
+      const masterUsername = process.env.MASTER_USERNAME;
+      
+      if (!masterUsername) {
+        console.error('❌ MASTER_USERNAME not set in environment!');
+        return res.status(500).json({ error: 'Server configuration error' });
+      }
+
+      // Cari user master di database
+      const masterResult = await pool.query(
+        'SELECT id, username, role FROM users WHERE username = $1 AND role = $2',
+        [masterUsername, 'master']
+      );
+
+      if (masterResult.rows.length === 0) {
+        // Fallback: kalo ga nemu master di DB, pake 'master' sebagai ID
+        console.warn('⚠️ Master user not found in database, using fallback');
+        req.user = {
+          id: 'master',
+          username: masterUsername,
+          role: 'master'
+        };
+        return next();
+      }
+
+      // Pake UUID dari database
       req.user = {
-        id: 'master',
-        username: decoded.username || process.env.MASTER_USERNAME,
+        id: masterResult.rows[0].id,
+        username: masterResult.rows[0].username,
         role: 'master'
       };
       return next();
     }
 
-    // Check sub-user
+    // === SUB-USER ===
     const result = await pool.query(
       'SELECT id, username, role FROM users WHERE id = $1',
       [decoded.id]
@@ -34,7 +59,9 @@ const authenticate = async (req, res, next) => {
 
     req.user = result.rows[0];
     next();
+    
   } catch (error) {
+    console.error('Auth error:', error.message);
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
