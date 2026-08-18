@@ -1,66 +1,70 @@
-const express = require('express');
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 
-const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'default_secret_change_me';
 
-router.post('/login', async (req, res, next) => {
+const authenticate = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
     }
 
-    // Check master
-    if (username === process.env.MASTER_USERNAME && 
-        password === process.env.MASTER_PASSWORD) {
-      const token = jwt.sign(
-        { id: 'master', role: 'master', username: process.env.MASTER_USERNAME },
-        JWT_SECRET,
-        { expiresIn: '7d' }
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // === IF MASTER ===
+    if (decoded.role === 'master' || decoded.id === 'master') {
+      const masterUsername = process.env.MASTER_USERNAME;
+      
+      if (!masterUsername) {
+        console.error('❌ MASTER_USERNAME not set!');
+        return res.status(500).json({ error: 'Server config error' });
+      }
+
+      // Cari master di database
+      const masterResult = await pool.query(
+        'SELECT id, username, role FROM users WHERE username = $1 AND role = $2',
+        [masterUsername, 'master']
       );
-      return res.json({ 
-        token, 
-        role: 'master',
-        username: process.env.MASTER_USERNAME
-      });
+
+      if (masterResult.rows.length === 0) {
+        console.error('❌ Master user not found in database!');
+        return res.status(401).json({ error: 'Master account not found' });
+      }
+
+      // ✅ PAKE UUID DARI DATABASE!
+      req.user = {
+        id: masterResult.rows[0].id,
+        username: masterResult.rows[0].username,
+        role: 'master'
+      };
+      return next();
     }
 
-    // Check sub-user
+    // === SUB-USER ===
     const result = await pool.query(
-      'SELECT id, username, password_hash, role FROM users WHERE username = $1',
-      [username]
+      'SELECT id, username, role FROM users WHERE id = $1',
+      [decoded.id]
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'User not found' });
     }
 
-    const user = result.rows[0];
-    const valid = await bcrypt.compare(password, user.password_hash);
-
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, role: user.role, username: user.username },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    await pool.query(
-      'UPDATE users SET last_login = NOW() WHERE id = $1',
-      [user.id]
-    );
-
-    res.json({ token, role: user.role, username: user.username });
+    req.user = result.rows[0];
+    next();
+    
   } catch (error) {
-    next(error);
+    console.error('Auth error:', error.message);
+    return res.status(401).json({ error: 'Invalid token' });
   }
-});
+};
 
-module.exports = router;
+const isMaster = (req, res, next) => {
+  if (req.user?.role !== 'master') {
+    return res.status(403).json({ error: 'Master access required' });
+  }
+  next();
+};
+
+module.exports = { authenticate, isMaster };

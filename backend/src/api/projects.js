@@ -17,25 +17,35 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.post('/amp/generate', authenticate, upload.single('titleFile'), async (req, res, next) => {
   try {
     const { sourceDomain, siteName, canonical, targetLink } = req.body;
+    
+    // ✅ userId sekarang UUID (dari auth.js)
     const userId = req.user.id;
     
+    console.log(`📝 Generating AMP for user: ${userId}, site: ${siteName}`);
+
     if (!sourceDomain || !siteName) {
       return res.status(400).json({ error: 'sourceDomain and siteName required' });
     }
-    
+
     // 1. Parse title file
+    if (!req.file) {
+      return res.status(400).json({ error: 'titleFile is required' });
+    }
+
     const titleContent = req.file.buffer.toString('utf-8');
     const titles = parseTitleFile(titleContent, siteName);
-    
+
     if (titles.length === 0) {
       return res.status(400).json({ error: 'No title found for site name: ' + siteName });
     }
-    
+
     const selectedTitle = titles[Math.floor(Math.random() * titles.length)];
     const description = await generateDescription(selectedTitle);
+
+    // 2. Scrape website
     const scrapedData = await scrapeWebsite(sourceDomain);
-    
-    // Generate images
+
+    // 3. Generate images
     const heroImage = await generateImage({
       prompt: `Hero image for ${siteName}, theme: judi online, modern, elegant female character, 8k`,
       type: 'hero'
@@ -48,7 +58,8 @@ router.post('/amp/generate', authenticate, upload.single('titleFile'), async (re
       prompt: `Favicon for ${siteName}, simple, recognizable`,
       type: 'favicon'
     });
-    
+
+    // 4. Transform HTML
     const html = await transformAMP({
       scrapedData,
       siteName,
@@ -56,9 +67,14 @@ router.post('/amp/generate', authenticate, upload.single('titleFile'), async (re
       targetLink: targetLink || sourceDomain,
       title: selectedTitle,
       description,
-      images: { hero: heroImage.url, logo: logo.url, favicon: favicon.url }
+      images: { 
+        hero: heroImage.url, 
+        logo: logo.url, 
+        favicon: favicon.url 
+      }
     });
-    
+
+    // 5. ✅ INSERT ke database pake userId (UUID)
     const result = await pool.query(`
       INSERT INTO projects (
         user_id, type, source_domain, site_name, canonical_url, target_link,
@@ -66,26 +82,39 @@ router.post('/amp/generate', authenticate, upload.single('titleFile'), async (re
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id
     `, [
-      userId, 'amp', sourceDomain, siteName, canonical || sourceDomain, targetLink || sourceDomain,
+      userId,  // ← SEKARANG UUID, BUKAN 'master'!
+      'amp', 
+      sourceDomain, 
+      siteName, 
+      canonical || sourceDomain, 
+      targetLink || sourceDomain,
       JSON.stringify({ title: selectedTitle, description }),
       html,
       'ready'
     ]);
-    
+
     const projectId = result.rows[0].id;
-    
+
+    // 6. Save assets
     await saveAssets(projectId, { hero: heroImage, logo, favicon });
-    await sendTelegramLog(`✅ AMP Generated\nUser: ${req.user.username}\nSite: ${siteName}`);
-    
+
+    // 7. Telegram log
+    await sendTelegramLog(`✅ AMP Generated\nUser: ${req.user.username}\nSite: ${siteName}\nTitle: ${selectedTitle}`);
+
     res.status(201).json({
       projectId,
       title: selectedTitle,
       description,
       html,
-      images: { hero: heroImage.url, logo: logo.url, favicon: favicon.url }
+      images: { 
+        hero: heroImage.url, 
+        logo: logo.url, 
+        favicon: favicon.url 
+      }
     });
-    
+
   } catch (error) {
+    console.error('❌ AMP generation error:', error.message);
     next(error);
   }
 });
@@ -106,10 +135,12 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       miniGamePosition,
       miniGameCustomSelector
     } = req.body;
-    
+
     const userId = req.user.id;
     let title, description, heroImage, logo, favicon;
-    
+
+    console.log(`📝 Generating LP for user: ${userId}, site: ${siteName}`);
+
     // If using AMP title
     if (useAmpTitle === 'true') {
       const ampProject = await pool.query(`
@@ -117,32 +148,45 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
         WHERE user_id = $1 AND type = 'amp'
         ORDER BY created_at DESC LIMIT 1
       `, [userId]);
-      
+
       if (ampProject.rows.length > 0) {
         const config = ampProject.rows[0].config;
         title = config.title;
         description = config.description;
       }
     }
-    
+
     // If no AMP title, generate fresh
     if (!title) {
+      if (!req.file) {
+        return res.status(400).json({ error: 'titleFile is required when not using AMP title' });
+      }
+
       const titleContent = req.file.buffer.toString('utf-8');
       const titles = parseTitleFile(titleContent, siteName);
       if (titles.length === 0) {
-        return res.status(400).json({ error: 'No title found' });
+        return res.status(400).json({ error: 'No title found for site name: ' + siteName });
       }
       title = titles[Math.floor(Math.random() * titles.length)];
       description = await generateDescription(title);
-      
-      heroImage = await generateImage({ prompt: `Hero for ${siteName}`, type: 'hero' });
-      logo = await generateImage({ prompt: `Logo for ${siteName}`, type: 'logo' });
-      favicon = await generateImage({ prompt: `Favicon for ${siteName}`, type: 'favicon' });
+
+      heroImage = await generateImage({ 
+        prompt: `Hero for ${siteName}`, 
+        type: 'hero' 
+      });
+      logo = await generateImage({ 
+        prompt: `Logo for ${siteName}`, 
+        type: 'logo' 
+      });
+      favicon = await generateImage({ 
+        prompt: `Favicon for ${siteName}`, 
+        type: 'favicon' 
+      });
     }
-    
+
     const scrapedData = await scrapeWebsite(sourceDomain);
     const content = await generateContent(siteName, title, description);
-    
+
     const html = await transformLP({
       scrapedData,
       siteName,
@@ -151,7 +195,11 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       title,
       description,
       content,
-      images: { hero: heroImage?.url, logo: logo?.url, favicon: favicon?.url },
+      images: { 
+        hero: heroImage?.url, 
+        logo: logo?.url, 
+        favicon: favicon?.url 
+      },
       miniGame: {
         enabled: miniGameEnabled === 'true',
         type: miniGameType || 'spin',
@@ -159,7 +207,7 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
         customSelector: miniGameCustomSelector || null
       }
     });
-    
+
     const result = await pool.query(`
       INSERT INTO projects (
         user_id, type, source_domain, site_name, canonical_url, target_link,
@@ -168,7 +216,12 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING id
     `, [
-      userId, 'landingpage', sourceDomain, siteName, canonical || sourceDomain, ampLink || sourceDomain,
+      userId,
+      'landingpage',
+      sourceDomain,
+      siteName,
+      canonical || sourceDomain,
+      ampLink || sourceDomain,
       JSON.stringify({ title, description }),
       html,
       'ready',
@@ -177,24 +230,29 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       miniGamePosition || 'daftar',
       miniGameCustomSelector || null
     ]);
-    
+
     const projectId = result.rows[0].id;
-    
+
     if (heroImage?.url) {
       await saveAssets(projectId, { hero: heroImage, logo, favicon });
     }
-    
+
     await sendTelegramLog(`✅ LP Generated\nUser: ${req.user.username}\nSite: ${siteName}`);
-    
+
     res.status(201).json({
       projectId,
       title,
       description,
       html,
-      images: { hero: heroImage?.url, logo: logo?.url, favicon: favicon?.url }
+      images: { 
+        hero: heroImage?.url, 
+        logo: logo?.url, 
+        favicon: favicon?.url 
+      }
     });
-    
+
   } catch (error) {
+    console.error('❌ LP generation error:', error.message);
     next(error);
   }
 });
@@ -208,7 +266,7 @@ router.get('/history/:type', authenticate, async (req, res, next) => {
     const userId = req.user.id;
     const { page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
-    
+
     const result = await pool.query(`
       SELECT id, type, source_domain, site_name, config, 
         status, created_at, html_content
@@ -218,12 +276,12 @@ router.get('/history/:type', authenticate, async (req, res, next) => {
       ORDER BY created_at DESC
       LIMIT $4 OFFSET $5
     `, [userId, type, `%${search}%`, limit, offset]);
-    
+
     res.json({
       data: result.rows,
       pagination: { page, limit, total: result.rows.length }
     });
-    
+
   } catch (error) {
     next(error);
   }
@@ -236,18 +294,18 @@ router.get('/:id', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    
+
     const result = await pool.query(`
       SELECT * FROM projects
       WHERE id = $1 AND user_id = $2
     `, [id, userId]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
+
     res.json(result.rows[0]);
-    
+
   } catch (error) {
     next(error);
   }
@@ -260,9 +318,10 @@ router.delete('/:id', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    
+
     await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2', [id, userId]);
     res.json({ message: 'Project deleted' });
+
   } catch (error) {
     next(error);
   }
@@ -275,32 +334,34 @@ router.delete('/history/all/:type', authenticate, async (req, res, next) => {
   try {
     const { type } = req.params;
     const userId = req.user.id;
-    
+
     await pool.query('DELETE FROM projects WHERE user_id = $1 AND type = $2', [userId, type]);
     res.json({ message: `All ${type} history deleted` });
+
   } catch (error) {
     next(error);
   }
 });
 
 // ============================================
-// 7. GET SCRIPT
+// 7. GET SCRIPT (HTML)
 // ============================================
 router.get('/:id/script', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    
+
     const result = await pool.query(
       'SELECT html_content FROM projects WHERE id = $1 AND user_id = $2',
       [id, userId]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
+
     res.send(result.rows[0].html_content);
+
   } catch (error) {
     next(error);
   }
@@ -313,13 +374,14 @@ router.get('/:id/assets', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    
+
     const result = await pool.query(`
       SELECT type, file_url FROM project_assets
       WHERE project_id = $1
     `, [id]);
-    
+
     res.json(result.rows);
+
   } catch (error) {
     next(error);
   }
@@ -333,7 +395,7 @@ function parseTitleFile(content, siteName) {
   const lines = content.split('\n').map(l => l.trim()).filter(l => l);
   const titles = [];
   let currentSection = '';
-  
+
   for (const line of lines) {
     if (line.startsWith('#')) {
       currentSection = line.substring(1).trim().toLowerCase();
@@ -341,7 +403,7 @@ function parseTitleFile(content, siteName) {
       titles.push(line);
     }
   }
-  
+
   return titles;
 }
 
