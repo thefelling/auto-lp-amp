@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 
 async function scrapeWebsite(url) {
@@ -6,38 +6,8 @@ async function scrapeWebsite(url) {
   
   let browser;
   try {
-    // === CARA BARU: Auto-detect executable path ===
-    const executablePaths = [
-      process.env.PUPPETEER_EXECUTABLE_PATH,
-      '/usr/bin/chromium',
-      '/usr/bin/chromium-browser',
-      '/usr/bin/google-chrome',
-      '/usr/bin/google-chrome-stable',
-      '/snap/bin/chromium',
-      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    ].filter(Boolean);
-
-    let executablePath = null;
-    const fs = require('fs');
-    
-    for (const path of executablePaths) {
-      try {
-        if (fs.existsSync(path)) {
-          executablePath = path;
-          break;
-        }
-      } catch (e) {}
-    }
-
-    if (!executablePath) {
-      throw new Error('No Chrome/Chromium executable found. Please install chromium or set PUPPETEER_EXECUTABLE_PATH');
-    }
-
-    console.log(`✅ Using Chrome at: ${executablePath}`);
-
+    // Puppeteer akan otomatis download Chromium
     browser = await puppeteer.launch({
-      executablePath: executablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -46,14 +16,19 @@ async function scrapeWebsite(url) {
         '--no-first-run',
         '--no-zygote',
         '--single-process',
-        '--disable-extensions'
+        '--disable-extensions',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process'
       ],
       headless: true,
       ignoreHTTPSErrors: true,
+      timeout: 30000,
     });
 
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1280, height: 800 });
+    
     await page.goto(url, { 
       waitUntil: 'networkidle2', 
       timeout: 30000 

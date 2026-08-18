@@ -5,9 +5,10 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
-  "dependencies": {
+    "dependencies": {
     "@fal-ai/client": "^1.2.0",
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
