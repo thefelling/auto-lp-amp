@@ -73,7 +73,6 @@
   border-color: #374151 !important;
 }
 
-/* Scrollbar dark */
 .dark ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

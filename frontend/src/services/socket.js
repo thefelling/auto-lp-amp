@@ -1,8 +1,5 @@
 // Socket service (untuk real-time progress monitoring)
 // Note: Ini opsional, belum diimplementasikan di backend
-import io from 'socket.io-client';
-
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '';
 
 class SocketService {
   constructor() {
@@ -13,66 +10,34 @@ class SocketService {
   connect(token) {
     if (this.socket && this.connected) return;
 
-    this.socket = io(SOCKET_URL, {
-      auth: { token },
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-
-    this.socket.on('connect', () => {
-      this.connected = true;
-      console.log('🔌 Socket connected');
-    });
-
-    this.socket.on('disconnect', () => {
-      this.connected = false;
-      console.log('🔌 Socket disconnected');
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.error('🔌 Socket error:', error.message);
-    });
+    // Simulasi socket (karena backend belum pake socket.io)
+    console.log('🔌 Socket service initialized (mock mode)');
+    this.connected = true;
   }
 
   disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-      this.connected = false;
-    }
+    this.socket = null;
+    this.connected = false;
   }
 
   emit(event, data) {
-    if (this.socket && this.connected) {
-      this.socket.emit(event, data);
-    }
+    console.log(`📤 Socket emit: ${event}`, data);
   }
 
   on(event, callback) {
-    if (this.socket) {
-      this.socket.on(event, callback);
-    }
+    console.log(`📥 Socket on: ${event}`);
   }
 
   off(event, callback) {
-    if (this.socket) {
-      this.socket.off(event, callback);
-    }
+    console.log(`📥 Socket off: ${event}`);
   }
 
-  // Join room untuk subscribe ke progress project tertentu
   joinProjectRoom(projectId) {
-    if (this.socket && this.connected) {
-      this.socket.emit('join-project', { projectId });
-    }
+    console.log(`📦 Joining project room: ${projectId}`);
   }
 
   leaveProjectRoom(projectId) {
-    if (this.socket && this.connected) {
-      this.socket.emit('leave-project', { projectId });
-    }
+    console.log(`📦 Leaving project room: ${projectId}`);
   }
 }
 

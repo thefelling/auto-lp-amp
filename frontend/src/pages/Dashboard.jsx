@@ -1,13 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import Navbar from '../components/Navbar';
 import { FiFileText, FiLayout, FiClock, FiSettings, FiPlus } from 'react-icons/fi';
 
 const Dashboard = () => {
   const { user, isMaster } = useAuth();
-  const { darkMode } = useTheme();
 
   const cards = [
     { title: 'Generate AMP', desc: 'Buat landing page AMP dari domain lain', icon: FiFileText, path: '/amp', color: 'bg-blue-500' },

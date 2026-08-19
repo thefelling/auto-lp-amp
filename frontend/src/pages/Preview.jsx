@@ -60,7 +60,6 @@ const Preview = () => {
           </h1>
         </div>
 
-        {/* Device Toggle */}
         <div className="flex items-center gap-2 mb-4 bg-white dark:bg-gray-800 rounded-lg p-2 shadow-lg w-fit">
           <button
             onClick={() => setDevice('mobile')}
@@ -82,7 +81,6 @@ const Preview = () => {
           </button>
         </div>
 
-        {/* Preview Frame */}
         <div className={`mx-auto ${deviceClasses[device]} bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transition-all`}>
           <iframe
             srcDoc={project.html_content || ''}
@@ -92,7 +90,6 @@ const Preview = () => {
           />
         </div>
 
-        {/* Actions */}
         <div className="flex gap-3 mt-4">
           <button
             onClick={() => {

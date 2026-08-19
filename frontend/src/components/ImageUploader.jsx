@@ -6,7 +6,7 @@ const ImageUploader = ({
   onUpload, 
   accept = 'image/*',
   multiple = false,
-  maxSize = 5, // MB
+  maxSize = 5,
   label = 'Upload Gambar'
 }) => {
   const [files, setFiles] = useState([]);
@@ -17,7 +17,6 @@ const ImageUploader = ({
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     
-    // Validasi ukuran
     const validFiles = selectedFiles.filter(file => {
       const sizeMB = file.size / 1024 / 1024;
       if (sizeMB > maxSize) {
@@ -30,23 +29,15 @@ const ImageUploader = ({
     if (validFiles.length === 0) return;
 
     setFiles(validFiles);
-    
-    // Generate preview
     const previews = validFiles.map(file => URL.createObjectURL(file));
     setPreviews(previews);
 
     if (onUpload) {
       setLoading(true);
       onUpload(validFiles)
-        .then(() => {
-          toast.success('Upload berhasil!');
-        })
-        .catch((error) => {
-          toast.error(error.message || 'Upload gagal');
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+        .then(() => toast.success('Upload berhasil!'))
+        .catch((error) => toast.error(error.message || 'Upload gagal'))
+        .finally(() => setLoading(false));
     }
   };
 
@@ -66,25 +57,10 @@ const ImageUploader = ({
     }
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length > 0) {
-      const event = { target: { files: droppedFiles } };
-      handleFileChange(event);
-    }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
   return (
     <div className="w-full">
       {files.length === 0 ? (
         <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
           onClick={() => inputRef.current?.click()}
           className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition"
         >
@@ -99,7 +75,7 @@ const ImageUploader = ({
           <FiImage size={40} className="mx-auto text-gray-400 dark:text-gray-500 mb-3" />
           <p className="text-gray-600 dark:text-gray-300 font-medium">{label}</p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-            Drag & drop atau klik untuk pilih
+            Klik untuk pilih
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
             Maks {maxSize}MB per file

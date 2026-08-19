@@ -73,7 +73,6 @@ const DashboardMaster = () => {
           👑 Master Dashboard
         </h1>
 
-        {/* Balance */}
         {balance && (
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg mb-6 flex gap-6">
             <div className="flex items-center gap-2">
@@ -87,7 +86,6 @@ const DashboardMaster = () => {
           </div>
         )}
 
-        {/* Add User */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-6">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
             <FiUserPlus /> Tambah User Baru
@@ -117,7 +115,6 @@ const DashboardMaster = () => {
           </form>
         </div>
 
-        {/* User List */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">

@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { FiEye, FiCopy, FiDownload, FiTrash2, FiClock } from 'react-icons/fi';
-import { format } from 'date-fns';
+import { FiEye, FiCopy, FiTrash2, FiClock } from 'react-icons/fi';
 
 const History = () => {
   const { type } = useParams();
   const navigate = useNavigate();
-  const { isMaster } = useAuth();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');

@@ -25,7 +25,6 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
       <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col`}>
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
             {title || 'Modal'}
@@ -37,8 +36,6 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
             <FiX size={20} className="text-gray-500 dark:text-gray-400" />
           </button>
         </div>
-
-        {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {children}
         </div>

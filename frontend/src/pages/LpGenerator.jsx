@@ -160,7 +160,7 @@ const LpGenerator = () => {
                 className="w-4 h-4 text-blue-600 rounded"
               />
               <label className="text-sm text-gray-700 dark:text-gray-300">
-                Gunakan title dari AMP (title, desc, hero, logo, favicon)
+                Gunakan title dari AMP
               </label>
             </div>
 
