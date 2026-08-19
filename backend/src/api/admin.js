@@ -33,6 +33,10 @@ router.post('/users', authenticate, isMaster, async (req, res, next) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
     const hashed = await bcrypt.hash(password, 10);
 
     const result = await pool.query(`
@@ -51,13 +55,49 @@ router.post('/users', authenticate, isMaster, async (req, res, next) => {
 });
 
 // ============================================
+// UPDATE USER PASSWORD (master only) 🔥 BARU!
+// ============================================
+router.put('/users/:id/password', authenticate, isMaster, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Cek apakah user ada
+    const userCheck = await pool.query('SELECT id, username FROM users WHERE id = $1', [id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [hashed, id]
+    );
+
+    res.json({ 
+      message: `Password updated for ${userCheck.rows[0].username}`,
+      username: userCheck.rows[0].username
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
 // DELETE USER (master only)
 // ============================================
 router.delete('/users/:id', authenticate, isMaster, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    if (id === 'master') {
+    // Cegah delete master
+    const userCheck = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
+    if (userCheck.rows.length > 0 && userCheck.rows[0].role === 'master') {
       return res.status(403).json({ error: 'Cannot delete master account' });
     }
 
