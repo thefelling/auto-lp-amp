@@ -289,7 +289,7 @@ router.delete('/history/all/:type', authenticate, async (req, res, next) => {
 });
 
 // ============================================
-// 7. GET SCRIPT
+// 7. GET SCRIPT (HTML)
 // ============================================
 router.get('/:id/script', authenticate, async (req, res, next) => {
   try {
