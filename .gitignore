@@ -1,0 +1,25 @@
+# Node
+node_modules/
+.env
+*.log
+*.pid
+
+# Build
+dist/
+build/
+.vercel/
+.railway/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+coverage/
+.nyc_output/
