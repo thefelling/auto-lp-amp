@@ -7,6 +7,9 @@
 /assets/*.mjs
   Content-Type: application/javascript
 
+/assets/*.css
+  Content-Type: text/css
+
 /*.js
   Content-Type: application/javascript
 
@@ -15,3 +18,15 @@
 
 /*.css
   Content-Type: text/css
+
+/*.svg
+  Content-Type: image/svg+xml
+
+/*.png
+  Content-Type: image/png
+
+/*.jpg
+  Content-Type: image/jpeg
+
+/*.ico
+  Content-Type: image/x-icon
