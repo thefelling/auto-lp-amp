@@ -15,10 +15,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false, // ← MATIKIN SOURCEMAP DULU
+    sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: undefined,
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[hash].[ext]'
