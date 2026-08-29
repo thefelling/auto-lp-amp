@@ -27,9 +27,9 @@ router.post('/scrape', authenticate, async (req, res, next) => {
       userId,
       name,
       url,
-      scrapedData.layout.content || scrapedData.html,
+      scrapedData.html,
       scrapedData.inlineStyles || '',
-      JSON.stringify(scrapedData.layout)
+      JSON.stringify({ ...scrapedData.layout, meta: scrapedData.meta, theme: scrapedData.theme })
     ]);
 
     res.status(201).json(result.rows[0]);

@@ -38,18 +38,7 @@ router.post('/amp/generate', authenticate, upload.single('titleFile'), async (re
     const description = await generateDescription(selectedTitle);
     const scrapedData = await scrapeWebsite(sourceDomain);
 
-    const heroImage = await generateImage({
-      prompt: `Hero image for ${siteName}, theme: judi online, modern, elegant female character, 8k`,
-      type: 'hero'
-    });
-    const logo = await generateImage({
-      prompt: `Logo for ${siteName}, modern, minimalis, gold and red`,
-      type: 'logo'
-    });
-    const favicon = await generateImage({
-      prompt: `Favicon for ${siteName}, simple, recognizable`,
-      type: 'favicon'
-    });
+    const [heroImage, logo, favicon] = await generateProjectImages(siteName);
 
     const html = await transformAMP({
       scrapedData,
@@ -111,7 +100,8 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
     const userId = req.user.id;
     let title, description, heroImage, logo, favicon;
 
-    if (useAmpTitle === 'true') {
+    const shouldUseAmpTitle = useAmpTitle === true || useAmpTitle === 'true' || useAmpTitle === '1';
+    if (shouldUseAmpTitle) {
       const ampProject = await pool.query(`
         SELECT config, html_content FROM projects
         WHERE user_id = $1 AND type = 'amp'
@@ -138,9 +128,10 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       title = titles[Math.floor(Math.random() * titles.length)];
       description = await generateDescription(title);
 
-      heroImage = await generateImage({ prompt: `Hero for ${siteName}`, type: 'hero' });
-      logo = await generateImage({ prompt: `Logo for ${siteName}`, type: 'logo' });
-      favicon = await generateImage({ prompt: `Favicon for ${siteName}`, type: 'favicon' });
+    }
+
+    if (!heroImage || !logo || !favicon) {
+      [heroImage, logo, favicon] = await generateProjectImages(siteName);
     }
 
     const scrapedData = await scrapeWebsite(sourceDomain);
@@ -175,7 +166,7 @@ router.post('/lp/generate', authenticate, upload.single('titleFile'), async (req
       JSON.stringify({ title, description }),
       html,
       'ready',
-      miniGameEnabled === 'true',
+        miniGameEnabled === true || miniGameEnabled === 'true' || miniGameEnabled === '1',
       miniGameType || 'spin',
       miniGamePosition || 'daftar',
       miniGameCustomSelector || null
@@ -337,19 +328,26 @@ router.get('/:id/assets', authenticate, async (req, res, next) => {
 // ============================================
 
 function parseTitleFile(content, siteName) {
-  const lines = content.split('\n').map(l => l.trim()).filter(l => l);
-  const titles = [];
-  let currentSection = '';
+  const lines = String(content || '').replace(/^\uFEFF/, '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const wanted = String(siteName || '').trim().toLocaleLowerCase();
+  if (!wanted) return [];
 
-  for (const line of lines) {
-    if (line.startsWith('#')) {
-      currentSection = line.substring(1).trim().toLowerCase();
-    } else if (currentSection === siteName.toLowerCase() && line) {
-      titles.push(line);
-    }
-  }
+  // Format utama: satu title per baris. Nama situs cukup muncul di dalam title.
+  // Contoh: "OMUTOGEL | selalu di hati" akan cocok untuk siteName "omutogel".
+  const titles = lines
+    .filter(line => !line.startsWith('#') && !/^\[[^\]]+\]$/.test(line))
+    .map(line => line.replace(/^[-*]\s*/, '').trim())
+    .filter(title => title.length >= 3 && title.toLocaleLowerCase().includes(wanted));
 
-  return titles;
+  return [...new Set(titles)];
+}
+
+async function generateProjectImages(siteName) {
+  return Promise.all([
+    generateImage({ prompt: `Hero image for ${siteName}, modern and elegant`, type: 'hero' }),
+    generateImage({ prompt: `Logo for ${siteName}, modern minimal logo`, type: 'logo' }),
+    generateImage({ prompt: `Simple favicon for ${siteName}`, type: 'favicon' })
+  ]);
 }
 
 async function saveAssets(projectId, images) {
@@ -364,3 +362,4 @@ async function saveAssets(projectId, images) {
 }
 
 module.exports = router;
+module.exports.parseTitleFile = parseTitleFile;

@@ -1,248 +1,70 @@
 const cheerio = require('cheerio');
-const { generateContent } = require('./ai-generator');
 
-// ============================================
-// TRANSFORM AMP
-// ============================================
+function loadDocument(html) {
+  const $ = cheerio.load(html || '<!doctype html><html><head></head><body><main><h1></h1><p></p></main></body></html>', { decodeEntities: false });
+  if (!$('html').length) $('root').wrap('<html></html>');
+  if (!$('head').length) $('html').prepend('<head></head>');
+  if (!$('body').length) $('html').append('<body></body>');
+  return $;
+}
+function upsertMeta($, name, content) {
+  let el = $(`meta[name="${name}"]`).first();
+  if (!el.length) el = $('<meta>').attr('name', name).appendTo('head');
+  el.attr('content', content || '');
+}
+function upsertCanonical($, href) {
+  let el = $('link[rel="canonical"]').first();
+  if (!el.length) el = $('<link>').attr('rel', 'canonical').appendTo('head');
+  el.attr('href', href || '');
+}
+function removeTracking($) {
+  $('script').each((i, el) => { const text = $(el).html() || ''; if (/google-analytics|gtag|googletagmanager/i.test(text)) $(el).remove(); });
+  $('meta[name="google-site-verification"]').remove();
+}
+function replaceImages($, siteName, images = {}) {
+  let first = true;
+  $('img').each((i, el) => {
+    const alt = ($(el).attr('alt') || '').toLowerCase();
+    if (first || alt.includes('hero') || alt.includes('banner')) {
+      if (images.hero) $(el).attr('src', images.hero);
+      $(el).attr('alt', `Hero ${siteName}`); first = false;
+    }
+    if (alt.includes('logo') && images.logo) { $(el).attr('src', images.logo); $(el).attr('alt', `Logo ${siteName}`); }
+  });
+  if (images.favicon) $('link[rel="icon"], link[rel="shortcut icon"]').attr('href', images.favicon);
+}
+function safeBrandRegex(value) { return value ? new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi') : null; }
+
 async function transformAMP({ scrapedData, siteName, canonical, targetLink, title, description, images }) {
-  console.log(`🔄 Transforming AMP for: ${siteName}`);
-  
-  let $ = cheerio.load(scrapedData.html);
-  
-  // 1. Ganti title
-  $('title').text(title);
-  console.log(`✅ Title replaced: ${title}`);
-  
-  // 2. Ganti meta description
-  $('meta[name="description"]').attr('content', description);
-  console.log(`✅ Description replaced`);
-  
-  // 3. Ganti canonical
-  $('link[rel="canonical"]').attr('href', canonical);
-  console.log(`✅ Canonical replaced: ${canonical}`);
-  
-  // 4. Hapus GA & GSC
-  $('script').each((i, el) => {
-    const html = $(el).html() || '';
-    if (html.includes('google-analytics') || html.includes('gtag') || html.includes('googletagmanager')) {
-      $(el).remove();
-    }
-  });
-  
-  $('meta').each((i, el) => {
-    const name = $(el).attr('name') || '';
-    if (name === 'google-site-verification') {
-      $(el).remove();
-    }
-  });
-  
-  // 5. Ganti semua href dan src yang mengandung domain lama
-  const oldDomain = extractDomain(scrapedData.meta.canonical || scrapedData.meta.ogTitle || scrapedData.html);
-  if (oldDomain) {
-    const newDomain = canonical || targetLink || siteName;
-    console.log(`🔄 Replacing domain: ${oldDomain} → ${newDomain}`);
-    
-    $('a[href]').each((i, el) => {
-      const href = $(el).attr('href');
-      if (href && href.includes(oldDomain)) {
-        $(el).attr('href', href.replace(oldDomain, newDomain));
-      }
-    });
-    
-    $('link[href]').each((i, el) => {
-      const href = $(el).attr('href');
-      if (href && href.includes(oldDomain)) {
-        $(el).attr('href', href.replace(oldDomain, newDomain));
-      }
-    });
-  }
-  
-  // 6. Ganti gambar (hero, logo, favicon)
-  let imageIndex = 0;
-  $('img').each((i, el) => {
-    const alt = $(el).attr('alt') || '';
-    const src = $(el).attr('src') || '';
-    
-    // Hero image: cari gambar pertama atau yang ada kata hero/banner
-    if (imageIndex === 0 || alt.toLowerCase().includes('hero') || alt.toLowerCase().includes('banner')) {
-      $(el).attr('src', images.hero);
-      $(el).attr('alt', `Hero ${siteName}`);
-      imageIndex++;
-    }
-    
-    // Logo: cari yang ada kata logo
-    if (alt.toLowerCase().includes('logo') || src.toLowerCase().includes('logo')) {
-      $(el).attr('src', images.logo);
-      $(el).attr('alt', `Logo ${siteName}`);
-    }
-  });
-  
-  // 7. Ganti favicon
-  $('link[rel="icon"], link[rel="shortcut icon"]').attr('href', images.favicon);
-  console.log(`✅ Favicon replaced`);
-  
-  // 8. Ganti semua mention nama situs lama → nama situs baru
-  const oldSiteName = scrapedData.meta.title?.split('-')[0]?.trim() || 'Situs';
-  console.log(`🔄 Replacing brand: ${oldSiteName} → ${siteName}`);
-  
-  let htmlStr = $.html();
-  
-  // Replace di text content (h1, h2, p, span, a, div)
-  htmlStr = htmlStr.replaceAll(new RegExp(oldSiteName, 'gi'), siteName);
-  
-  // Replace di meta tags
-  htmlStr = htmlStr.replaceAll(new RegExp(oldSiteName, 'gi'), siteName);
-  
-  // 9. Ganti H1 utama dengan nama situs (jika ada)
-  const $temp = cheerio.load(htmlStr);
-  const firstH1 = $temp('h1').first();
-  if (firstH1.length > 0) {
-    const currentText = firstH1.text();
-    if (!currentText.toLowerCase().includes(siteName.toLowerCase())) {
-      firstH1.text(`${siteName} - ${currentText}`);
-    }
-  }
-  htmlStr = $temp.html();
-  
-  console.log(`✅ AMP transformation complete`);
-  return htmlStr;
+  const $ = loadDocument(scrapedData?.html);
+  $('title').remove(); $('<title>').text(title || siteName).prependTo('head');
+  upsertMeta($, 'description', description); upsertCanonical($, canonical || targetLink);
+  removeTracking($); replaceImages($, siteName, images);
+  const old = scrapedData?.meta?.title?.split('-')[0]?.trim(); const regex = safeBrandRegex(old);
+  if (regex && old && old.toLowerCase() !== siteName.toLowerCase()) $('body').html(($('body').html() || '').replace(regex, siteName));
+  if (!$('h1').length) $('main').prepend(`<h1>${siteName}</h1>`);
+  return $.html();
 }
 
-// ============================================
-// TRANSFORM LP
-// ============================================
 async function transformLP({ scrapedData, siteName, canonical, ampLink, title, description, content, images, miniGame }) {
-  console.log(`🔄 Transforming LP for: ${siteName}`);
-  
-  let $ = cheerio.load(scrapedData.html);
-  
-  // 1. Ganti title
-  $('title').text(title);
-  
-  // 2. Ganti meta description
-  $('meta[name="description"]').attr('content', description);
-  
-  // 3. Ganti canonical
-  $('link[rel="canonical"]').attr('href', canonical);
-  
-  // 4. Generate konten baru (jika ada content)
-  if (content) {
-    // Ganti H1
-    const firstH1 = $('h1').first();
-    if (firstH1.length > 0) {
-      firstH1.text(content.h1 || `${siteName} - Situs Terpercaya`);
-    }
-    
-    // Ganti H2
-    const h2s = $('h2');
-    if (content.h2 && Array.isArray(content.h2)) {
-      h2s.each((i, el) => {
-        if (i < content.h2.length) {
-          $(el).text(content.h2[i]);
-        }
-      });
-    }
-    
-    // Ganti intro paragraph
-    const firstP = $('p').first();
-    if (firstP.length > 0 && content.intro) {
-      firstP.text(content.intro);
-    }
-  }
-  
-  // 5. Hapus GA & GSC
-  $('script').each((i, el) => {
-    const html = $(el).html() || '';
-    if (html.includes('google-analytics') || html.includes('gtag') || html.includes('googletagmanager')) {
-      $(el).remove();
-    }
-  });
-  
-  // 6. Ganti gambar
-  let imageIndex = 0;
-  $('img').each((i, el) => {
-    const alt = $(el).attr('alt') || '';
-    if (imageIndex === 0 || alt.toLowerCase().includes('hero') || alt.toLowerCase().includes('banner')) {
-      if (images.hero) {
-        $(el).attr('src', images.hero);
-        $(el).attr('alt', `Hero ${siteName}`);
-      }
-      imageIndex++;
-    }
-    if (alt.toLowerCase().includes('logo')) {
-      if (images.logo) {
-        $(el).attr('src', images.logo);
-        $(el).attr('alt', `Logo ${siteName}`);
-      }
-    }
-  });
-  
-  if (images.favicon) {
-    $('link[rel="icon"], link[rel="shortcut icon"]').attr('href', images.favicon);
-  }
-  
-  // 7. Inject Mini Game
-  let htmlStr = $.html();
-  if (miniGame && miniGame.enabled) {
-    const gameHtml = generateMiniGame(miniGame.type, siteName);
-    const positionMap = {
-      hero: '</header>',
-      daftar: '</body>',
-      faq: '</body>',
-    };
-    const target = positionMap[miniGame.position] || '</body>';
-    htmlStr = htmlStr.replace(target, gameHtml + target);
-    console.log(`✅ Mini game injected: ${miniGame.type}`);
-  }
-  
-  // 8. Ganti semua mention nama situs lama → nama situs baru
-  const oldSiteName = scrapedData.meta.title?.split('-')[0]?.trim() || 'Situs';
-  console.log(`🔄 Replacing brand: ${oldSiteName} → ${siteName}`);
-  htmlStr = htmlStr.replaceAll(new RegExp(oldSiteName, 'gi'), siteName);
-  
-  console.log(`✅ LP transformation complete`);
-  return htmlStr;
+  const $ = loadDocument(scrapedData?.html);
+  $('title').remove(); $('<title>').text(title || siteName).prependTo('head');
+  upsertMeta($, 'description', description); upsertCanonical($, canonical || ampLink);
+  const main = $('main, .content, article').first().length ? $('main, .content, article').first() : $('body');
+  let h1 = $('h1').first(); if (!h1.length) h1 = $('<h1>').prependTo(main);
+  h1.text(content?.h1 || title || `${siteName} - Situs Terpercaya`);
+  const h2s = content?.h2 || []; $('h2').each((i, el) => { if (h2s[i]) $(el).text(h2s[i]); });
+  let p = $('p').first(); if (!p.length) p = $('<p>').appendTo(main); if (content?.intro) p.text(content.intro);
+  if (content?.benefits?.length && !$('.generated-benefits').length) $('<ul class="generated-benefits">').append(content.benefits.map(item => $('<li>').text(item))).appendTo(main);
+  removeTracking($); replaceImages($, siteName, images);
+  if (miniGame?.enabled) $('body').append(generateMiniGame(miniGame.type, siteName));
+  const old = scrapedData?.meta?.title?.split('-')[0]?.trim(); const regex = safeBrandRegex(old);
+  if (regex && old && old.toLowerCase() !== siteName.toLowerCase()) $('body').html(($('body').html() || '').replace(regex, siteName));
+  return $.html();
 }
-
-// ============================================
-// HELPERS
-// ============================================
-
-function extractDomain(text) {
-  if (!text) return null;
-  const match = text.match(/https?:\/\/([^\/\s]+)/);
-  return match ? match[1] : null;
-}
-
 function generateMiniGame(type, siteName) {
-  const games = {
-    spin: `
-    <div style="text-align:center;padding:20px;background:#1a1a2e;border-radius:12px;color:white;margin:20px 0;">
-      <h3>🎰 Spin & Win!</h3>
-      <button onclick="alert('🎉 Selamat! Anda dapat Bonus 100%')" style="padding:10px 30px;background:#e94560;border:none;border-radius:8px;color:white;cursor:pointer;font-size:18px;">SPIN</button>
-    </div>
-    `,
-    slot: `
-    <div style="text-align:center;padding:20px;background:#1a1a2e;border-radius:12px;color:white;margin:20px 0;">
-      <h3>🎰 Slot</h3>
-      <button onclick="alert('🎉 JACKPOT!')" style="padding:10px 30px;background:#e94560;border:none;border-radius:8px;color:white;cursor:pointer;font-size:18px;">SPIN</button>
-    </div>
-    `,
-    coinflip: `
-    <div style="text-align:center;padding:20px;background:#1a1a2e;border-radius:12px;color:white;margin:20px 0;">
-      <h3>🪙 Coin Flip</h3>
-      <button onclick="alert(Math.random() > 0.5 ? '👑 Head' : '🦅 Tail')" style="padding:10px 30px;background:#e94560;border:none;border-radius:8px;color:white;cursor:pointer;font-size:18px;">FLIP</button>
-    </div>
-    `,
-    dadu: `
-    <div style="text-align:center;padding:20px;background:#1a1a2e;border-radius:12px;color:white;margin:20px 0;">
-      <h3>🎲 Dadu</h3>
-      <button onclick="alert('🎲 ' + (Math.floor(Math.random()*6)+1))" style="padding:10px 30px;background:#e94560;border:none;border-radius:8px;color:white;cursor:pointer;font-size:18px;">ROLL</button>
-    </div>
-    `,
-  };
-  
-  return games[type] || games.spin;
+  const labels = { spin: 'SPIN', slot: 'PLAY', coinflip: 'FLIP', dadu: 'ROLL' };
+  const label = labels[type] || labels.spin;
+  return `<section class="mini-game" aria-label="Mini game" style="text-align:center;padding:20px;margin:20px 0;background:#1a1a2e;color:white;border-radius:12px"><h2>Bonus ${siteName}</h2><button type="button" onclick="alert('Terima kasih sudah mencoba!')" style="padding:10px 24px;background:#e94560;color:white;border:0;border-radius:8px">${label}</button></section>`;
 }
-
 module.exports = { transformAMP, transformLP };
