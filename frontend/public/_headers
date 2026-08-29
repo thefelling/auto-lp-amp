@@ -1,14 +1,13 @@
 /*
   X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://auto-lp-amp-production.up.railway.app;
 
 /assets/*.js
   Content-Type: application/javascript
 
 /assets/*.mjs
   Content-Type: application/javascript
-
-/assets/*.css
-  Content-Type: text/css
 
 /*.js
   Content-Type: application/javascript

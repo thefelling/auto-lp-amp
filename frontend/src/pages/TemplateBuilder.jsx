@@ -15,7 +15,7 @@ const TemplateBuilder = () => {
 
   const fetchTemplates = async () => {
     try {
-      const res = await api.get('/templates/list');
+      const res = await api.get('/api/templates/list');
       setTemplates(res.data || []);
     } catch (error) {
       toast.error('Gagal ambil templates');
@@ -30,7 +30,7 @@ const TemplateBuilder = () => {
     }
     setLoading(true);
     try {
-      await api.post('/templates/scrape', newTemplate);
+      await api.post('/api/templates/scrape', newTemplate);
       toast.success('Template berhasil dibuat');
       setNewTemplate({ name: '', url: '' });
       fetchTemplates();
@@ -44,7 +44,7 @@ const TemplateBuilder = () => {
   const handleDelete = async (id) => {
     if (!confirm('Hapus template ini?')) return;
     try {
-      await api.delete(`/templates/${id}`);
+      await api.delete(`/api/templates/${id}`);
       toast.success('Template dihapus');
       fetchTemplates();
     } catch (error) {

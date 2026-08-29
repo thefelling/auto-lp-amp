@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: '/', // ← PASTIKAN INI '/'
   server: {
     port: 5173,
     proxy: {
@@ -16,6 +17,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    sourcemap: false,
     rollupOptions: {
       output: {
         entryFileNames: 'assets/[name].[hash].js',

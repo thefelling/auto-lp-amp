@@ -22,7 +22,7 @@ const History = () => {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/projects/history/${type}`, {
+      const res = await api.get(`/api/projects/history/${type}`, {
         params: { page, limit: 10, search }
       });
       setProjects(res.data.data || []);
@@ -36,7 +36,7 @@ const History = () => {
   const handleDelete = async (id) => {
     if (!confirm('Hapus project ini?')) return;
     try {
-      await api.delete(`/projects/${id}`);
+      await api.delete(`/api/projects/${id}`);
       toast.success('Project dihapus');
       fetchProjects();
     } catch (error) {
@@ -47,7 +47,7 @@ const History = () => {
   const handleDeleteAll = async () => {
     if (!confirm(`Hapus semua ${typeLabel}?`)) return;
     try {
-      await api.delete(`/projects/history/all/${type}`);
+      await api.delete(`/api/projects/history/all/${type}`);
       toast.success('Semua history dihapus');
       fetchProjects();
     } catch (error) {

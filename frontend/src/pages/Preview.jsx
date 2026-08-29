@@ -18,7 +18,7 @@ const Preview = () => {
 
   const fetchProject = async () => {
     try {
-      const res = await api.get(`/projects/${id}`);
+      const res = await api.get(`/api/projects/${id}`);
       setProject(res.data);
     } catch (error) {
       toast.error('Project tidak ditemukan');

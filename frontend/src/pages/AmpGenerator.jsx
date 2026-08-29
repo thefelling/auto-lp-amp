@@ -42,7 +42,7 @@ const AmpGenerator = () => {
     form.append('titleFile', titleFile);
 
     try {
-      const res = await api.post('/projects/amp/generate', form, {
+      const res = await api.post('/api/projects/amp/generate', form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setResult(res.data);
@@ -74,7 +74,7 @@ const AmpGenerator = () => {
                 value={formData.sourceDomain}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="https://go.maxwinolx1.com/"
+                placeholder="domain contoh gunakan https://"
                 required
               />
             </div>
@@ -89,7 +89,7 @@ const AmpGenerator = () => {
                 value={formData.siteName}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="omutogel"
+                placeholder="nama situs"
                 required
               />
             </div>
@@ -104,7 +104,7 @@ const AmpGenerator = () => {
                 value={formData.canonical}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="https://omutogel.com/"
+                placeholder="link canonical use https://"
               />
             </div>
 
@@ -118,7 +118,7 @@ const AmpGenerator = () => {
                 value={formData.targetLink}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="https://omutogel.com/login"
+                placeholder="link situs use https://"
               />
             </div>
 

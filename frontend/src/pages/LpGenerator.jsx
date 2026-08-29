@@ -59,7 +59,7 @@ const LpGenerator = () => {
     }
 
     try {
-      const res = await api.post('/projects/lp/generate', form, {
+      const res = await api.post('/api/projects/lp/generate', form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setResult(res.data);
